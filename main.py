@@ -93,8 +93,11 @@ def parse_vless(vless_url):
             "network": params.get("type", ["tcp"])[0],
             "tls": True if params.get("security", [""])[0] in ["tls", "reality"] else False,
             "udp": True,
-            "flow": params.get("flow", [""])[0],
         }
+        
+        flow = params.get("flow", [""])[0]
+        if flow:
+            proxy["flow"] = flow
         
         if params.get("security", [""])[0] == "reality":
             proxy["servername"] = params.get("sni", [""])[0]
@@ -105,6 +108,9 @@ def parse_vless(vless_url):
             }
         elif params.get("security", [""])[0] == "tls":
             proxy["servername"] = params.get("sni", [""])[0]
+            # Some clients need client-fingerprint even for normal TLS
+            if params.get("fp"):
+                proxy["client-fingerprint"] = params.get("fp", ["chrome"])[0]
             
         return proxy
     except Exception as e:
@@ -201,15 +207,33 @@ def convert_subscriptions(url):
     if url.lower().startswith("http://") or url.lower().startswith("https://"):
         print(f"正在获取订阅: {url}")
         headers = {"User-Agent": "Mozilla/5.0"}
-        req = urllib.request.Request(url, headers=headers)
         
-        try:
+        # Helper to fetch URL with retry
+        def fetch_url(target_url):
+            req = urllib.request.Request(target_url, headers=headers)
             with urllib.request.urlopen(req) as response:
-                content = response.read().decode('utf-8')
-                # Capture User-Info header for traffic display
-                user_info = response.getheader('Subscription-Userinfo')
-                if user_info:
-                    print(f"获取到流量信息: {user_info}")
+                return response.read().decode('utf-8'), response.getheader('Subscription-Userinfo')
+
+        try:
+            content, user_info = fetch_url(url)
+            if user_info:
+                print(f"获取到流量信息: {user_info}")
+                
+        except urllib.error.HTTPError as e:
+            # Handle HTTP 400 Bad Request (likely HTTP vs HTTPS mismatch on port 2096/8443 etc)
+            if e.code == 400 and url.lower().startswith("http://"):
+                 print(f"[提示] HTTP请求返回 400 错误，尝试切换为 HTTPS 重试...")
+                 new_url = url.replace("http://", "https://", 1)
+                 try:
+                     content, user_info = fetch_url(new_url)
+                     if user_info:
+                        print(f"获取到流量信息: {user_info}")
+                 except Exception as e2:
+                     print(f"重试失败: {e2}")
+                     return None, None
+            else:
+                print(f"获取订阅失败: {e}")
+                return None, None
         except Exception as e:
             print(f"获取订阅失败: {e}")
             return None, None
