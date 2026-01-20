@@ -106,6 +106,9 @@ def parse_vless(vless_url):
                 "public-key": params.get("pbk", [""])[0],
                 "short-id": params.get("sid", [""])[0],
             }
+            # FL Clash may require flow for Reality
+            if not proxy.get("flow"):
+                proxy["flow"] = ""
         elif params.get("security", [""])[0] == "tls":
             proxy["servername"] = params.get("sni", [""])[0]
             # Some clients need client-fingerprint even for normal TLS
