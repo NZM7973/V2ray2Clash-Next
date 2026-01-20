@@ -422,9 +422,21 @@ def main():
     if save_file:
         if not os.path.exists(OUTPUT_DIR):
             os.makedirs(OUTPUT_DIR)
-        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        
+        # Ask for custom filename for multi-user support
+        print("\n请输入配置文件名称 (用于区分不同用户，如 '小明' 或 '用户1'):")
+        custom_name = input("[直接回车使用默认名称 config]: ").strip()
+        
+        if custom_name:
+            # Sanitize filename
+            safe_name = "".join(c for c in custom_name if c.isalnum() or c in ('-', '_', ' '))
+            output_path = os.path.join(OUTPUT_DIR, f"{safe_name}.yaml")
+        else:
+            output_path = OUTPUT_FILE
+            
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(yaml_content)
-        print(f"\n[SUCCESS] 配置文件已保存至: {os.path.abspath(OUTPUT_FILE)}")
+        print(f"\n[SUCCESS] 配置文件已保存至: {os.path.abspath(output_path)}")
         
     if run_server:
         # Find a free port or use default
